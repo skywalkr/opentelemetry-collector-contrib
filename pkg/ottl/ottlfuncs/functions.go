@@ -129,7 +129,7 @@ func converters[K any]() []ottl.Factory[K] {
 		NewParseSeverityFactory[K](),
 		NewProfileIDFactory[K](),
 		NewParseIntFactory[K](),
-		NewParseIpFactory[K](),
+		NewParseIPFactory[K](),
 		NewKeysFactory[K](),
 		NewXXH3Factory[K](),
 		NewXXH128Factory[K](),

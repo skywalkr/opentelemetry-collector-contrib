@@ -1,3 +1,6 @@
+// Copyright The OpenTelemetry Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package ottlfuncs // import "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl/ottlfuncs"
 
 import (
@@ -6,35 +9,49 @@ import (
 	"net"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl"
+	"go.opentelemetry.io/collector/pdata/pcommon"
 )
 
-type ParseIpArguments[K any] struct {
-	Ip ottl.StringGetter[K]
+type ParseIPArguments[K any] struct {
+	IP ottl.StringGetter[K]
 }
 
-func NewParseIpFactory[K any]() ottl.Factory[K] {
-	return ottl.NewFactory("ParseIp", &ParseIpArguments[K]{}, createParseIpFunction[K])
+func NewParseIPFactory[K any]() ottl.Factory[K] {
+	return ottl.NewFactory("ParseIP", &ParseIPArguments[K]{}, createParseIPFunction[K])
 }
 
-func createParseIpFunction[K any](_ ottl.FunctionContext, oArgs ottl.Arguments) (ottl.ExprFunc[K], error) {
-	args, ok := oArgs.(*ParseIpArguments[K])
-
+func createParseIPFunction[K any](_ ottl.FunctionContext, oArgs ottl.Arguments) (ottl.ExprFunc[K], error) {
+	args, ok := oArgs.(*ParseIPArguments[K])
 	if !ok {
-		return nil, errors.New("ParseIpFactory args must be of type *ParseIpArguments[K]")
+		return nil, errors.New("ParseIpFactory args must be of type *ParseIPArguments[K]")
 	}
 
-	return parseIpFunc(args.Ip)
+	return parseIPFunc(args.IP), nil
 }
 
-func parseIpFunc[K any](target ottl.StringGetter[K]) (ottl.ExprFunc[K], error) {
+// parseIPFunc returns a `pcommon.Map` struct that is a result of parsing the target string as an IP address
+func parseIPFunc[K any](target ottl.StringGetter[K]) ottl.ExprFunc[K] {
 	return func(ctx context.Context, tCtx K) (any, error) {
-		targetValue, err := target.Get(ctx, tCtx)
+		t, err := target.Get(ctx, tCtx)
 		if err != nil {
 			return nil, err
 		}
+		if t == "" {
+			return nil, errors.New("cannot parse from empty target")
+		}
 
-		ip := net.ParseIP(targetValue)
+		result := net.ParseIP(t)
 
-		return ip, nil
-	}, nil
+		if result == nil {
+			return nil, errors.New("could not parse IP address from target")
+		}
+
+		var resultMap = pcommon.NewMap()
+		resultMap.PutStr("Address", result.String())
+		resultMap.PutBool("IsMulticast", result.IsMulticast())
+		resultMap.PutBool("IsLoopback", result.IsLoopback())
+		resultMap.PutBool("IsPrivate", result.IsPrivate())
+
+		return resultMap, nil
+	}
 }
